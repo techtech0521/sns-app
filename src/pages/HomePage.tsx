@@ -3,14 +3,18 @@ import { useAuth } from '../contexts/AuthContext';
 export default function HomePage() {
 	const { profile, signOut } = useAuth();
 
+	const handleSignOut = async () => {
+		await signOut();
+	}
+
 	return (
 		<div className="min-h-screen bg-gray-50">
 			<header className="bg-white border-b border-gray-200">
 				<div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
 					<h1 className="text-2xl font-bold text-primary-600">SNS App</h1>
-					<button onClick={signOut} className="btn-secondary text-sm">
-						ログアウト
-					</button>
+					<button onClick={handleSignOut} className="btn-secondary text-sm">
+                        ログアウト
+                    </button>
 				</div>
 			</header>
 

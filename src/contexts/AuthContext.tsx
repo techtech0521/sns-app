@@ -11,8 +11,8 @@ interface AuthContextType {
     profile: Profile | null;
     session: Session | null;
     loading: boolean;
-    signUp: (email: string, password: string) => Promise<{ error: AuthError | null}>;
-    signIn: (email: string, password: string) => Promise<{ error: AuthError | null}>;
+    signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+    signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -25,87 +25,101 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // プロフィール取得
-    const fetchProfile = async (userId: string) => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-            
-            if (error) throw error;
-            setProfile(data);
-        } catch (error) {
-            console.error('プロフィール取得エラー:', error);
-            setProfile(null);
-        }
-    };
-
-    // プロフィール再取得（編集後などに使用）
-    const refreshProfile = async () => {
-        if (user) {
-            await fetchProfile(user.id);
-        }
-    };
-
-    // 初期化とセッション監視
     useEffect(() => {
-        // 現在のセッション取得
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchProfile(session.user.id);
+        let ignore = false;
+        let initialAuthHandled = false;
+
+        // 認証状態変更の監視を先に設定
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+
+            // 初期認証（ページロード時）は getSession で処理するため、INITIAL_SESSION まではスキップ
+            if (!initialAuthHandled) {
+                if (event === 'INITIAL_SESSION') {
+                    initialAuthHandled = true;
+                }
+                return;
             }
-            setLoading(false);
-        });
 
-        // 認証状態変更の監視
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (ignore) return;
+
             setSession(session);
             setUser(session?.user ?? null);
 
             if (session?.user) {
-                await fetchProfile(session.user.id);
+                try {
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+                    if (!ignore) {
+                        setProfile(profileData);
+                    }
+                } catch (err) {
+                    console.error('>>> プロフィール取得エラー (onAuthStateChange):', err);
+                }
             } else {
-                setProfile(null);
+                if (!ignore) {
+                    setProfile(null);
+                }
             }
-            setLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        // 初期セッション取得
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (ignore) return;
+
+            setSession(session);
+            setUser(session?.user ?? null);
+
+            if (session?.user) {
+                try {
+                    const { data: profileData } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+                    if (!ignore) {
+                        setProfile(profileData);
+                    }
+                } catch (err) {
+                    console.error('>>> プロフィール取得エラー (getSession):', err);
+                }
+            }
+
+            if (!ignore) {
+                setLoading(false);
+            } else {
+            }
+        });
+
+        return () => {
+            ignore = true;
+            subscription.unsubscribe();
+        };
     }, []);
 
-    // サインアップ
+    const refreshProfile = async () => {
+        if (user) {
+            const { data } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            setProfile(data);
+        }
+    };
+
     const signUp = async (email: string, password: string) => {
-        try {
-            const { error } = await supabase.auth.signUp({
-                email,
-                password,
-            });
-            return { error };
-        } catch (error) {
-            return { error: error as AuthError };
-        }
+        const { error } = await supabase.auth.signUp({ email, password });
+        return { error };
     };
 
-    // サインイン
     const signIn = async (email: string, password: string) => {
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-            return { error };
-        } catch (error) {
-            return { error: error as AuthError };
-        }
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        return { error };
     };
 
-    // サインアウト
     const signOut = async () => {
         await supabase.auth.signOut();
     };

@@ -41,6 +41,7 @@ export default function AuthPage() {
                 if (signInError) {
                     setError('メールアドレスまたはパスワードが間違っています');
                 } else {
+                    // ログイン成功時は即座にリダイレクト
                     navigate('/');
                 }
             } else {
@@ -53,7 +54,10 @@ export default function AuthPage() {
                         setError('アカウント作成に失敗しました');
                     }
                 } else {
-                    setMessage('確認メールを送信しました。メールを確認してください。');
+                    // サインアップ成功時もリダイレクト（確認メール不要の設定の場合）
+                    setMessage('アカウントを作成しました');
+                    // 少し待ってからリダイレクト
+                    setTimeout(() => navigate('/'), 1000);
                 }
             }
         } catch (err) {
@@ -80,11 +84,10 @@ export default function AuthPage() {
                                 setError('');
                                 setMessage('');
                             }}
-                            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                                isLogin
+                            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${isLogin
                                     ? 'bg-white text-primary-600 shadow-sm'
                                     : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                                }`}
                         >
                             ログイン
                         </button>
@@ -95,11 +98,10 @@ export default function AuthPage() {
                                 setError('');
                                 setMessage('');
                             }}
-                            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                                !isLogin
+                            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${!isLogin
                                     ? 'bg-white text-primary-600 shadow-sm'
                                     : 'text-gray-600 hover:text-gray-800'
-                            }`}
+                                }`}
                         >
                             新規登録
                         </button>
@@ -110,7 +112,7 @@ export default function AuthPage() {
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                                 メールアドレス
                             </label>
-                            <input 
+                            <input
                                 id='email'
                                 type='email'
                                 value={email}
@@ -125,7 +127,7 @@ export default function AuthPage() {
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                                 パスワード
                             </label>
-                            <input 
+                            <input
                                 id='password'
                                 type='password'
                                 value={password}
