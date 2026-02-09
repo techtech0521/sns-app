@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { validateHandle } from '../utils/validation';
+import type { Database } from '../types/database.types';
 
 export default function ProfileEditPage() {
     const { user, profile, loading: authLoading, refreshProfile } = useAuth();
@@ -66,14 +67,16 @@ export default function ProfileEditPage() {
         setHandleError('');
 
         try {
-            const { error } = await supabase
+            const updates: Database['public']['Tables']['profiles']['Update'] = {
+                username: username.trim() || null,
+                handle: handle.trim(),
+                bio: bio.trim() || null,
+                avatar_url: avatarUrl.trim() || null,
+            };
+
+            const { error } = await (supabase as any)
                 .from('profiles')
-                .update({
-                    username: username.trim() || null,
-                    handle: handle.trim(),
-                    bio: bio.trim() || null,
-                    avatar_url: avatarUrl.trim() || null,
-                })
+                .update(updates)
                 .eq('id', user!.id);
             
             if (error) {
@@ -94,6 +97,11 @@ export default function ProfileEditPage() {
             // コンテキスト内のprofileを再取得して同期
             await refreshProfile();
             setSaved(true);
+
+            // 2秒後にプロフィールページへ遷移
+            setTimeout(() => {
+                navigate('/profile');
+            }, 2000);
         } catch (err) {
             console.error('プロフィール更新エラー:', err);
             setGeneralError('予期しないエラーが発生しました');
