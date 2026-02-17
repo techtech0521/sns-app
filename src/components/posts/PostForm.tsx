@@ -24,11 +24,35 @@ export default function PostForm({ editingPost, onPostCreated, onPostUpdated, on
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
+    // Supabaseクライアントの存在確認（コンポーネントマウント時）
+    useEffect(() => {
+        console.log('[PostForm] Supabaseクライアント初期確認:', {
+            exists: !!supabase,
+            hasFrom: typeof supabase?.from === 'function',
+            type: typeof supabase
+        });
+    }, []);
+
+    console.log('[PostForm] レンダリング', { 
+        isEditing: !!editingPost, 
+        userId: user?.id,
+        contentLength: content.length 
+    });
+
     const isEditing = !!editingPost;
     const maxLength = 140;
     const remaining = maxLength - content.length;
 
-    // 編集モード時に投稿内容をリセット
+    // userが存在しない場合の早期リターン
+    if (!user) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <p className="text-red-500 text-sm">ログインが必要です</p>
+            </div>
+        );
+    }
+
+    // 編集モード時に投稿内容をセット
     useEffect(() => {
         if (editingPost) {
             setContent(editingPost.content);
@@ -40,52 +64,122 @@ export default function PostForm({ editingPost, onPostCreated, onPostUpdated, on
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log('[PostForm] Submit開始', { isEditing, content: content.substring(0, 20) });
 
         // バリデーション
         const validation = validatePostContent(content);
         if (!validation.valid) {
+            console.log('[PostForm] バリデーションエラー:', validation.error);
             setError(validation.error ?? "");
             return;
         }
 
+        console.log('[PostForm] バリデーションOK、送信処理開始');
         setSubmitting(true);
         setError("");
 
         try {
             if (isEditing) {
                 // 編集
-                const { error } = await (supabase as any)
-                    .from("posts")
-                    .update({ content: content.trim()})
-                    .eq("id", editingPost.id);
+                console.log('[PostForm] 編集開始', editingPost.id);
+                console.log('[PostForm] supabaseオブジェクト:', supabase);
+                console.log('[PostForm] supabase.from:', typeof supabase?.from);
+                console.log('[PostForm] update()呼び出し直前');
+
+                if (!supabase || typeof supabase.from !== 'function') {
+                    throw new Error('Supabaseクライアントが初期化されていません');
+                }
+
+                // タイムアウト付きでupdate実行
+                const updatePromise = supabase
+                    .from('posts')
+                    .update({ content: content.trim() } as any)
+                    .eq('id', editingPost.id)
+                    .select();
+
+                console.log('[PostForm] updatePromise作成完了:', updatePromise);
                 
-                if (error) throw error;
-                onPostUpdated();
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('タイムアウト: 10秒経過')), 10000);
+                });
+                
+                try {
+                    console.log('[PostForm] Promise.race開始');
+                    const result = await Promise.race([updatePromise, timeoutPromise]) as any;
+                    console.log('[PostForm] Promise.race完了');
+                    console.log('[PostForm] update()呼び出し直後', result);
+                    const { data, error } = result;
+
+                    console.log('[PostForm] 編集結果', { data, error });
+                    
+                    if (error) {
+                        console.error('[PostForm] 編集エラー:', error);
+                        throw error;
+                    }
+                    
+                    console.log('[PostForm] onPostUpdated()呼び出し');
+                    onPostUpdated();
+                } catch (timeoutError: any) {
+                    if (timeoutError.message?.includes('タイムアウト')) {
+                        console.error('[PostForm] 10秒タイムアウト発生 - ネットワークタブを確認してください');
+                        console.error('[PostForm] updatePromiseの状態:', updatePromise);
+                        throw new Error('更新処理がタイムアウトしました。ネットワーク接続を確認してください。');
+                    }
+                    throw timeoutError;
+                }
             } else {
                 // 新規投稿
-                const { error } = await (supabase as any)
+                console.log('[PostForm] 新規投稿開始');
+                console.log('[PostForm] insert()呼び出し直前', {
+                    user_id: user!.id,
+                    content: content.trim()
+                });
+
+                const result = await supabase
                     .from('posts')
                     .insert({
                         user_id: user!.id,
                         content: content.trim(),
-                    });
+                    } as any)
+                    .select();
 
-                if (error) throw error;
+                console.log('[PostForm] insert()呼び出し直後', result);
+                const { data, error } = result;
+
+                console.log('[PostForm] 新規投稿結果', { data, error });
+
+                if (error) {
+                    console.error('[PostForm] 新規投稿エラー:', error);
+                    throw error;
+                }
+
+                console.log('[PostForm] onPostCreated()呼び出し');
                 onPostCreated();
             }
 
             setContent("");
+            console.log('[PostForm] 処理完了');
         } catch (err: any) {
-            console.error("投稿エラー:", err);
+            console.error('[PostForm] Catchブロック:', err);
+            console.error('[PostForm] エラー詳細:', {
+                message: err?.message,
+                code: err?.code,
+                details: err?.details,
+                hint: err?.hint,
+                stack: err?.stack
+            });
 
             //DBエラーに応じたメッセージ
             if (err.code === "23514") {
                 setError("投稿内容が制約に違反しています");
+            } else if (err.code === '42501') {
+                setError('投稿する権限がありません');
             } else {
-                setError("投稿に失敗しました。もう一度試してください。");
+                setError(`投稿に失敗しました: ${err.message || '不明なエラー'}`);
             }
         } finally {
             setSubmitting(false);
+            console.log('[PostForm] Finally: submitting=false');
         }
     };
 
@@ -124,8 +218,8 @@ export default function PostForm({ editingPost, onPostCreated, onPostUpdated, on
                     maxLength={maxLength}
                     className={`w-full px-3 py-2 border rounded-lg text-sm resize-none
                                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                                ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}/
-                >
+                                ${error ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                />
 
                 {/* エラーメッセージ */}
                 {error && (
