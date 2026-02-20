@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import LikeButton from './LikeButton';
 import type { Database } from "../../types/database.types";
 
 type Post = Database["public"]["Tables"]["posts"]["Row"];
@@ -81,6 +82,11 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
                     <p className="text-gray-800 text-sm whitespace-pre-wrap break-words">
                         {post.content}
                     </p>
+
+                    {/* いいねボタン */}
+                    <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
+                        <LikeButton postId={post.id} />
+                    </div>
 
                     {/* アクションボタン（自分の投稿のみ） */}
                     {isOwner && (
