@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import FollowButton from '../components/profile/FollowButton';
+import FollowStats from '../components/profile/FollowStats';
 
 export default function ProfilePage() {
     const { profile, loading } = useAuth();
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // フォロー状態変更時にフォロワー数を更新
+    const handleFollowChange = () => {
+        setRefreshTrigger(prev => prev + 1);
+    }
 
     if (loading) {
         return <div className="text-center py-12 text-gray-400">読み込み中…</div>;
@@ -33,12 +42,19 @@ export default function ProfilePage() {
 							<span className="text-3xl font-bold text-blue-600">{initials}</span>
 						)}
                     </div>
-					<Link
-						to="/profile/edit"
-						className="px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-					>
-						編集
-					</Link>
+
+                    <div>
+                        <FollowButton
+                            targetUserId={profile.id}
+                            onFollowChange={handleFollowChange}
+                        />
+                        <Link
+                            to="/profile/edit"
+                            className="px-4 py-1.5 rounded-full border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            編集
+                        </Link>
+                    </div>
                 </div>
 
 				{/* 表示名・handle */}
@@ -49,6 +65,11 @@ export default function ProfilePage() {
 				{profile.bio && (
 					<p className="mt-3 text-gray-700 whitespace-pre-wrap">{profile.bio}</p>
 				)}
+
+                {/* フォロー統計 */}
+                <div className="mt-4">
+                    <FollowStats userId={profile.id} refreshTrigger={refreshTrigger} />
+                </div>
 
 				{/* 登録日 */}
 				<p className="mt-4 text-xs text-gray-400">
