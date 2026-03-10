@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import LikeButton from './LikeButton';
@@ -49,8 +50,11 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
         <div className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
             {/* ヘッダー（アバター・ユーザー情報） */}
             <div className="flex items-start gap-3">
-                {/* アバター */}
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {/* アバター（クリック可能） */}
+                <Link 
+                    to={`/users/${post.profiles.handle}`}
+                    className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden hover:opacity-80 transition-opacity"
+                >
                     {post.profiles.avatar_url ? (
                         <img 
                             src={post.profiles.avatar_url} 
@@ -60,14 +64,24 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
                     ) : (
                         <span className="text-sm font-bold text-blue-600">{initials}</span>
                      )}
-                </div>
+                </Link>
 
                 {/* 投稿内容 */}
                 <div className="flex-1 min-w-0">
-                    {/* ユーザー名・handle・日時 */}
+                    {/* ユーザー名・handle・日時（ユーザー名とhandleをクリック可能に） */}
                     <div  className="flex items-baseline gap-2 mb-1">
-                        <span className="font-bold text-gray-900 text-sm">{displayName}</span>
-                        <span className="text-gray-500 text-xs">@{post.profiles.handle}</span>
+                        <Link 
+                            to={`/users/${post.profiles.handle}`}
+                            className="font-bold text-gray-900 text-sm hover:underline"
+                        >
+                            {displayName}
+                        </Link>
+                        <Link 
+                            to={`/users/${post.profiles.handle}`}
+                            className="text-gray-500 text-xs hover:underline"
+                        >
+                            @{post.profiles.handle}
+                        </Link>
                         <span className="text-gray-400 text-xs">
                             · {new Date(post.created_at).toLocaleString("ja-JP", {
                                                                 month: "short",

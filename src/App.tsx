@@ -6,6 +6,7 @@ import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ProfileEditPage from './pages/ProfileEditPage';
+import UserProfilePage from './pages/UserProfilePage';
 
 function App() {
     return (
@@ -27,6 +28,7 @@ function App() {
                         <Route index element={<HomePage />} />
                         <Route path="profile" element={<ProfilePage />} />
                         <Route path="profile/edit" element={<ProfileEditPage />} />
+                        <Route path="users/:handle" element={<UserProfilePage />} />
                     </Route>
 
                     {/* それ以外はトップへ */}
