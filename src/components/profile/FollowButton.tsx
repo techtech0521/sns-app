@@ -28,7 +28,6 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
     const fetchFollowStatus = async () => {
         try {
             setLoading(true);
-            console.log('[FollowButton] フォロー状態取得:', { follower: user!.id, following: targetUserId });
 
             const { data, error } = await supabase
                 .from("follows")
@@ -40,10 +39,9 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
             if (error) throw error;
 
             const followStatus = !!data;
-            console.log('[FollowButton] フォロー状態:', followStatus);
             setIsFollowing(followStatus);
         } catch (error) {
-            console.error('[FollowButton] フォロー状態取得エラー:', error);
+            console.error('フォロー状態取得エラー:', error);
         } finally {
             setLoading(false);
         }
@@ -51,8 +49,6 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
 
     const handleToggleFollow = async () => {
         if (!user || processing || isSelf) return;
-
-        console.log('[FollowButton] トグル開始:', { isFollowing, targetUserId });
 
         // 楽観的UI更新
         const previousIsFollowing = isFollowing;
@@ -65,7 +61,6 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
         try {
             if (isFollowing) {
                 // アンフォロー
-                console.log('[FollowButton] アンフォロー実行');
                 const { error } = await supabase
                     .from("follows")
                     .delete()
@@ -73,10 +68,8 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
                     .eq("following_id", targetUserId);
 
                 if (error) throw error;
-                console.log('[FollowButton] アンフォロー成功');
             } else {
                 // フォロー
-                console.log('[FollowButton] フォロー実行');
                 const { error } = await supabase
                     .from("follows")
                     .insert({
@@ -85,21 +78,18 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
                     } as any);
 
                 if (error) throw error;
-                console.log('[FollowButton] フォロー成功');
             }
         } catch (error: any) {
-            console.error('[FollowButton] トグルエラー:', error);
+            console.error('フォロートグルエラー:', error);
 
             // エラー時は元に戻す
             setIsFollowing(previousIsFollowing);
             onFollowChange?.(previousIsFollowing);
 
             // エラーメッセージ
-            if (error.code === "23505") {
-                console.log('[FollowButton] 重複フォロー検出（無視）');
-            } else if (error.code === "23514") {
+            if (error.code === '23514') {
                 alert('自分自身をフォローすることはできません');
-            } else {
+            } else if (error.code !== '23505') {
                 alert('フォロー処理に失敗しました');
             }
         } finally {

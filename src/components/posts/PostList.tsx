@@ -22,7 +22,6 @@ export default function PostList({ onEditPost, refreshTrigger }: PostListProps) 
 
     // 投稿一覧を取得
     const fetchPosts = async () => {
-        console.log('[PostList] fetchPosts開始');
         try {
             setLoading(true);
             setError("");
@@ -36,16 +35,10 @@ export default function PostList({ onEditPost, refreshTrigger }: PostListProps) 
                 .order("created_at", { ascending: false })
                 .limit(50);
 
-            console.log('[PostList] fetchPosts結果', { 
-                count: data?.length, 
-                error,
-                firstPost: data?.[0] ? (data[0] as any).content?.substring(0, 20) : null
-            });
-
             if (error) throw error;
             setPosts(data as PostWithProfile[]);
         } catch (err) {
-            console.error('[PostList] fetchPostsエラー:', err);
+            console.error('投稿取得エラー:', err);
             setError("投稿の読み込みに失敗しました");
         } finally {
             setLoading(false);
@@ -54,7 +47,6 @@ export default function PostList({ onEditPost, refreshTrigger }: PostListProps) 
 
     // 初回読み込みと更新トリガー
     useEffect(() => {
-        console.log('[PostList] useEffect: refreshTrigger=', refreshTrigger);
         fetchPosts();
     }, [refreshTrigger]);
 

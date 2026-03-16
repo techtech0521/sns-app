@@ -39,7 +39,6 @@ export default function UserProfilePage() {
         try {
             setLoading(true);
             setError("");
-            console.log('[UserProfilePage] プロフィール取得:', handle);
 
             const { data, error } = await supabase
                 .from("profiles")
@@ -56,10 +55,9 @@ export default function UserProfilePage() {
                 return;
             }
 
-            console.log('[UserProfilePage] プロフィール取得成功:', data);
             setProfile(data);
         } catch (err) {
-            console.error('[UserProfilePage] プロフィール取得エラー:', err);
+            console.error('プロフィール取得エラー:', err);
             setError('プロフィールの読み込みに失敗しました');
         } finally {
             setLoading(false);

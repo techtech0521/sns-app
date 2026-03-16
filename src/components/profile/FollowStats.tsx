@@ -18,7 +18,6 @@ export default function FollowStats({ userId, refreshTrigger = 0}: FollowStatsPr
     const fetchFollowStats = async () => {
         try {
             setLoading(true);
-            console.log('[FollowStats] フォロー統計取得:', userId);
 
             // フォロワー数（このユーザーをフォローしている人数）
             const { count: followers, error: followersError } = await supabase
@@ -36,12 +35,10 @@ export default function FollowStats({ userId, refreshTrigger = 0}: FollowStatsPr
 
             if (followingError) throw followingError;
 
-            console.log('[FollowStats] 統計結果:', { followers, following });
-
             setFollowerCount(followers || 0);
             setFollowingCount(following || 0);
         } catch (error) {
-            console.error('[FollowStats] フォロー統計取得エラー:', error);
+            console.error('フォロー統計取得エラー:', error);
         } finally {
             setLoading(false);
         }

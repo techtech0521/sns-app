@@ -46,7 +46,7 @@ export default function LikeButton({ postId }: LikeButtonProps) {
                 setIsLiked(!!data);
             }
         } catch (error) {
-            console.error("[LikeButton] いいね情報取得エラー:", error);
+            console.error('いいね情報取得エラー:', error);
         } finally {
             setLoading(false);
         }
@@ -66,7 +66,6 @@ export default function LikeButton({ postId }: LikeButtonProps) {
         try {
             if (isLiked) {
                 // いいね解除
-                console.log('[LikeButton] いいね解除:', postId);
                 const { error } = await supabase
                     .from("likes")
                     .delete()
@@ -74,10 +73,8 @@ export default function LikeButton({ postId }: LikeButtonProps) {
                     .eq("user_id", user.id);
 
                 if (error) throw error;
-                console.log('[LikeButton] いいね解除成功');
             } else {
                 // いいね追加
-                console.log('[LikeButton] いいね追加:', postId);
                 const { error } = await supabase
                     .from("likes")
                     .insert({
@@ -86,20 +83,17 @@ export default function LikeButton({ postId }: LikeButtonProps) {
                     } as any);
 
                 if (error) throw error;
-                console.log('[LikeButton] いいね追加成功');
             }
         } catch (error: any) {
-            console.error('[LikeButton] いいねトグルエラー:', error);
+            console.error('いいねトグルエラー:', error);
 
             // エラー時は元に戻す
             setIsLiked(previousIsLiked);
             setLikeCount(previousLikeConunt);
 
             // エラーメッセージ
-            if (error.code === "23505") {
-                console.log('[LikeButton] 重複いいね検出（無視）');
-            } else {
-                alert("いいねの処理に失敗しました");
+            if (error.code !== '23505') {
+                alert('いいねの処理に失敗しました');
             }
         } finally {
             setProcessing(false);
