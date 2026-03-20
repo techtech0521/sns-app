@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import ProfileEditPage from './pages/ProfileEditPage';
 import UserProfilePage from './pages/UserProfilePage';
+import SearchPage from './pages/SearchPage';
 
 function App() {
     return (
@@ -26,6 +27,7 @@ function App() {
                         }
                     >
                         <Route index element={<HomePage />} />
+                        <Route path="search" element={<SearchPage />} />
                         <Route path="profile" element={<ProfilePage />} />
                         <Route path="profile/edit" element={<ProfileEditPage />} />
                         <Route path="users/:handle" element={<UserProfilePage />} />
