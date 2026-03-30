@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { checkRateLimit, getRateLimitMessage } from "../../utils/rateLimit";
 
 interface LikeButtonProps {
     postId: string;
@@ -12,6 +13,7 @@ export default function LikeButton({ postId }: LikeButtonProps) {
     const [likeCount, setLikeCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState('');
 
     // いいね情報を取得
     useEffect(() => {
@@ -55,6 +57,14 @@ export default function LikeButton({ postId }: LikeButtonProps) {
     const handleToggleLike = async () => {
         if (!user || processing) return;
 
+        // レート制限チェック
+        const rateLimit = checkRateLimit("like_toggle");
+        if (!rateLimit.allowed) {
+            setError(getRateLimitMessage("like_toggle", rateLimit.resetIn!));
+            setTimeout(() => setError(""), 3000); // 3秒後にエラーメッセージを消す
+            return;
+        }
+
         // 楽観的UI更新（即座に反映）
         const previousIsLiked = isLiked;
         const previousLikeConunt = likeCount;
@@ -62,6 +72,7 @@ export default function LikeButton({ postId }: LikeButtonProps) {
         setIsLiked(!isLiked);
         setLikeCount(isLiked ? likeCount - 1: likeCount + 1);
         setProcessing(true);
+        setError('');
 
         try {
             if (isLiked) {
@@ -94,6 +105,7 @@ export default function LikeButton({ postId }: LikeButtonProps) {
             // エラーメッセージ
             if (error.code !== '23505') {
                 alert('いいねの処理に失敗しました');
+                setTimeout(() => setError(''), 3000);
             }
         } finally {
             setProcessing(false);
@@ -110,34 +122,39 @@ export default function LikeButton({ postId }: LikeButtonProps) {
     }
 
     return (
-        <button
-            onClick={handleToggleLike}
-            disabled={!user || processing}
-            className={`flex items-center gap-2 transition-colors ${
-                user
-                    ? 'hover:text-red-500 cursor-pointer'
-                    : 'cursor-not-allowed opacity-50'
-            } ${processing ? 'opacity-50' : ''}`}
-        >
-            {/* ハートアイコン */}
-            <span
-                className={`text-lg transition-all ${
-                    isLiked
-                        ? 'text-red-500 scale-110'
-                        : 'text-gray-400'
-                }`}
+        <div>
+            <button
+                onClick={handleToggleLike}
+                disabled={!user || processing}
+                className={`flex items-center gap-2 transition-colors ${
+                    user
+                        ? 'hover:text-red-500 cursor-pointer'
+                        : 'cursor-not-allowed opacity-50'
+                } ${processing ? 'opacity-50' : ''}`}
             >
-                {isLiked ? '❤️' : '♡'}
-            </span>
+                {/* ハートアイコン */}
+                <span
+                    className={`text-lg transition-all ${
+                        isLiked
+                            ? 'text-red-500 scale-110'
+                            : 'text-gray-400'
+                    }`}
+                >
+                    {isLiked ? '❤️' : '♡'}
+                </span>
 
-            {/* いいね数 */}
-            <span
-                className={`text-sm font-medium ${
-                    isLiked ? 'text-red-500' : 'text-gray-500'
-                }`}
-            >
-                {likeCount}
-            </span>
-        </button>
+                {/* いいね数 */}
+                <span
+                    className={`text-sm font-medium ${
+                        isLiked ? 'text-red-500' : 'text-gray-500'
+                    }`}
+                >
+                    {likeCount}
+                </span>
+            </button>
+            {error && (
+                <p className="text-xs text-red-500 mt-1">{error}</p>
+            )}
+        </div>
     );
 }

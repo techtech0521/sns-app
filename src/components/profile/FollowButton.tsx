@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { checkRateLimit, getRateLimitMessage } from "../../utils/rateLimit";
 
 interface FollowButtonProps {
     targetUserId: string;
@@ -12,6 +13,7 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
     const [isFollowing, setIsFollowing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState('');
 
     // 自分自身かどうか
     const isSelf = user?.id === targetUserId;
@@ -50,10 +52,19 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
     const handleToggleFollow = async () => {
         if (!user || processing || isSelf) return;
 
+        // レート制限チェック
+        const rateLimit = checkRateLimit("follow_toggle");
+        if (!rateLimit.allowed) {
+            setError(getRateLimitMessage("follow_toggle", rateLimit.resetIn!));
+            setTimeout(() => setError(""), 3000);
+            return;
+        }
+
         // 楽観的UI更新
         const previousIsFollowing = isFollowing;
         setIsFollowing(!isFollowing);
         setProcessing(true);
+        setError('');
 
         // 親コンポーネントに通知（フォロワー数更新用）
         onFollowChange?.(isFollowing);
@@ -92,6 +103,7 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
             } else if (error.code !== '23505') {
                 alert('フォロー処理に失敗しました');
             }
+            setTimeout(() => setError(''), 3000);
         } finally {
             setProcessing(false);
         }
@@ -114,16 +126,21 @@ export default function FollowButton({ targetUserId, onFollowChange }: FollowBut
     }
 
     return (
-        <button
-            onClick={handleToggleFollow}
-            disabled={processing}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                isFollowing
-                    ? 'border border-gray-300 text-gray-700 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-                {processing ? '処理中...' : isFollowing ? 'フォロー中' : 'フォローする'}
-        </button>
+        <div>
+            <button
+                onClick={handleToggleFollow}
+                disabled={processing}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    isFollowing
+                        ? 'border border-gray-300 text-gray-700 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                    {processing ? '処理中...' : isFollowing ? 'フォロー中' : 'フォローする'}
+            </button>
+            {error && (
+                <p className="text-xs text-red-500 mt-1">{error}</p>
+            )}
+        </div>
     );
 }
