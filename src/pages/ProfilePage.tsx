@@ -16,7 +16,7 @@ interface PostWithProfile extends Post {
 
 export default function ProfilePage() {
     const navigate = useNavigate();
-    const { user, profile } = useAuth();
+    const { profile } = useAuth();
     const [posts, setPosts] = useState<PostWithProfile[]>([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
