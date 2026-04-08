@@ -140,8 +140,6 @@ export default function UserProfilePage() {
     const displayName = profile.username || profile.handle;
     const initials = displayName[0]?.toUpperCase() ?? "?";
 
-    console.log("aaa");
-
     return (
         <div className="space-y-4">
             {/* プロフィールカード */}
