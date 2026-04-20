@@ -93,31 +93,43 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
                     </div>
 
                     {/* 投稿本文 */}
-                    <p className="text-gray-800 text-sm whitespace-pre-wrap break-words">
+                    <p className="text-gray-800 text-sm whitespace-pre-wrap break-words mb-2">
                         {post.content}
                     </p>
 
-                    {/* いいねボタン */}
-                    <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
-                        <LikeButton postId={post.id} />
-                    </div>
-
-                    {/* アクションボタン（自分の投稿のみ） */}
-                    {isOwner && (
-                        <div className="flex gap-2 mt-3">
-                            <button
-                                onClick={() => onEdit(post)}
-                                className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                                編集
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                className="text-xs text-red-500 hover:text-red-600 font-medium disabled:text-gray-400">
-                                {deleting ? '削除中...' : '削除'}
-                            </button>
+                    {/* 画像（あれば表示） */}
+                    {post.image_url && (
+                        <div className="mt-3 mb-2">
+                            <img 
+                                src={post.image_url} 
+                                alt="投稿画像" 
+                                className="max-h-96 w-full object-cover rounded-lg border border-gray-200"
+                            />
                         </div>
                     )}
+
+                    {/* アクションボタン */}
+                    <div className="flex items-center gap-4 mt-3">
+                        <LikeButton postId={post.id} />
+ 
+                        {isOwner && (
+                            <>
+                                <button
+                                    onClick={() => onEdit(post)}
+                                    className="text-xs text-gray-500 hover:text-blue-600 font-medium"
+                                >
+                                    編集
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={deleting}
+                                    className="text-xs text-gray-500 hover:text-red-600 font-medium disabled:opacity-50"
+                                >
+                                    {deleting ? '削除中...' : '削除'}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

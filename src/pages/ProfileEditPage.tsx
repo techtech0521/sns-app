@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { validateHandle } from '../utils/validation';
-import type { Database } from '../types/database.types';
+import { uplaodAvatar } from '../utils/imageUpload';
 
 export default function ProfileEditPage() {
     const { user, profile, loading: authLoading, refreshProfile } = useAuth();
@@ -14,89 +14,99 @@ export default function ProfileEditPage() {
     const [handle, setHandle] = useState('');
     const [bio, setBio] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     // UI状態
-    const [handleError, setHandleError] = useState('');
-    const [generalError, setGeneralError] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
     // profileが取得されたタイミングでフォームに流し込む
     useEffect(() => {
         if (profile) {
-            setUsername(profile.username ?? '');
-            setHandle(profile.handle);
-            setBio(profile.bio ?? '');
-            setAvatarUrl(profile.avatar_url ?? '');
+            setUsername(profile.username || '');
+            setHandle(profile.handle || '');
+            setBio(profile.bio || '');
+            setAvatarUrl(profile.avatar_url || '');
         }
     }, [profile]);
 
-    // --- handle入力（小文字正規化 + リアルタイム検証） ---
-    const onHandleChange = (value: string) => {
-        const lowered = value.toLowerCase();
-        setHandle(lowered);
-        const result = validateHandle(lowered);
-        setHandleError(result.error ?? '');
-        setSaved(false);
-        setGeneralError('');
-    };
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-    // --- その他フィールド入力 ---
-    const onFieldChange = (
-        setter: React.Dispatch<React.SetStateAction<string>>,
-        value: string
-    ) => {
-        setter(value);
-        setSaved(false);
-        setGeneralError('');
+        // プレビュー表示
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        setAvatarFile(file);
     };
 
     // --- 送信 ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError("");
+        setSuccess(false);
 
         // 送信直前に再検証（リアルタイム検証の漏れに対する二重保障）
-        const validation = validateHandle(handle);
-        if (!validation.valid) {
-            setHandleError(validation.error ?? '');
+        const handleValidation = validateHandle(handle);
+        if (!handleValidation.valid) {
+            setError(handleValidation.error ?? '');
             return;
         }
 
-        setSaving(true);
-        setGeneralError('');
-        setHandleError('');
+        setSubmitting(true);
 
         try {
-            const updates: Database['public']['Tables']['profiles']['Update'] = {
-                username: username.trim() || null,
-                handle: handle.trim(),
-                bio: bio.trim() || null,
-                avatar_url: avatarUrl.trim() || null,
-            };
+            let finalAvatarUrl = avatarUrl;
 
-            const { error } = await (supabase as any)
-                .from('profiles')
-                .update(updates)
-                .eq('id', user!.id);
-            
-            if (error) {
-                // PostgreSQLエラーコード → ユーザーフレンドリーメッセージ
-                switch (error.code) {
-                    case '23505': // unique_violation（handle重複）
-                        setHandleError('このユーザーIDは既に使用されています');
-                        break;
-                    case '23514': // check_violation（handle形式・長さ）
-                        setHandleError('ユーザーIDの形式が無効です');
-                        break;
-                    default:
-                        setGeneralError('保存に失敗しました。もう一度試してください。');
+            // アバター画像のアップロード
+            if (avatarFile && user) {
+                setUploadingAvatar(true);
+                const { url, error: uploadError } = await uplaodAvatar(avatarFile, user.id);
+
+                if (uploadError) {
+                    setError(uploadError);
+                    setUploadingAvatar(false);
+                    setSubmitting(false);
+                    return;
+                }
+
+                if (url) {
+                    finalAvatarUrl = url;
+                }
+                setUploadingAvatar(false);
+            }
+
+            // プロフィール更新
+            const { error: updateError } = await (supabase as any)
+                .from("profiles")
+                .update({
+                    username: username.trim() || null,
+                    handle: handle.toLowerCase().trim(),
+                    bio: bio.trim() || null,
+                    avatar_url: finalAvatarUrl || null,
+                })
+                .eq("id", user!.id)
+                .select()
+                .single();
+
+            if (updateError) {
+                if (updateError.code === "23505") {
+                    setError("このハンドルは既に使用されています");
+                } else {
+                    throw updateError;
                 }
                 return;
             }
 
-            // コンテキスト内のprofileを再取得して同期
             await refreshProfile();
-            setSaved(true);
+            setSuccess(true);
 
             // 2秒後にプロフィールページへ遷移
             setTimeout(() => {
@@ -104,134 +114,167 @@ export default function ProfileEditPage() {
             }, 2000);
         } catch (err) {
             console.error('プロフィール更新エラー:', err);
-            setGeneralError('予期しないエラーが発生しました');
+            setError('プロフィールの更新に失敗しました');
         } finally {
-            setSaving(false);
+            setSubmitting(false);
+
         }
     };
 
     // ロード中・プロフィール未取得
     if (authLoading || !profile) {
-        return <div className="text-center py-12 text-gray-400">読み込み中…</div>;
+        return (
+            <div className="text-center py-12">
+                <p className="text-gray-400">読み込み中...</p>
+            </div>
+        );
     }
 
+    const displayName = username || handle;
+    const initials = displayName[0]?.toUpperCase() ?? "?";
+    const currentAvatarUrl = previewUrl || avatarUrl;
+
     return (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-            {/* ヘッダー */}
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-lg font-bold text-gray-900">プロフィール編集</h1>
-                <button
-                    onClick={() => navigate('/profile')}
-                    className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                    ← 戻る
-                </button>
-            </div>
+        <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h1 className="text-2xl font-bold text-gray-900 mb-6">
+                    プロフィール編集
+                </h1>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* アバター */}
+                    <div>
+                        <label  className="block text-sm font-medium text-gray-700 mb-2">
+                            アバター画像
+                        </label>
+                        <div className="flex items-center gap-4">
+                            {/* アバタープレビュー */}
+                            <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border-2 border-gray-200">
+                                {currentAvatarUrl ? (
+                                    <img 
+                                        src={currentAvatarUrl}
+                                        alt="アバター"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="text-4xl font-bold text-blue-600">{initials}</span>
+                                )}
+                            </div>
 
-            {/* フィードバックメッセージ */}
-            {generalError && (
-                <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                    {generalError}
-                </div>
-            )}
-            {saved && (
-                <div className="mb-4 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                    プロフィールを更新しました ✓
-                </div>
-            )}
+                            {/* ファイル選択 */}
+                            <div className="flex-1">
+                                <input 
+                                    type="file"
+                                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                                    onChange={handleAvatarChange}
+                                    className="block w-full text-sm text-gray-500
+                                        file:mr-4 file:py-2 file:px-4
+                                        file:rounded-full file:border-0
+                                        file:text-sm file:font-semibold
+                                        file:bg-blue-50 file:text-blue-700
+                                        hover:file:bg-blue-100
+                                        cursor-pointer"
+                                    disabled={submitting} 
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    JPEG、PNG、GIF、WebP（最大5MB）
+                                </p>
+                            </div>
+                        </div>
+                    </div>
 
-            {/* フォーム */}
-            <form onSubmit={handleSubmit} className="space-y-5">
-                {/* 表示名 */}
-                <div>
-                    <label htmlFor="username"  className="block text-sm font-medium text-gray-700 mb-1">
-                        表示名
-                    </label>
-                    <input 
-                        id="username"
-                        type="text"
-                        value={username}
-                        onChange={(e) => onFieldChange(setUsername, e.target.value)}
-                        placeholder='山田太郎'
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                    />
-                </div>
-                
-                {/* ユーザーID（handle） */}
-                <div>
-                    <label htmlFor="handle" className="block text-sm font-medium text-gray-700 mb-1">
-                        ユーザーID <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                        id="handle"
-                        type="text"
-                        value={handle}
-                        onChange={(e) => onHandleChange(e.target.value)}
-                        placeholder="yamada_taro"
-                        className={`w-full px-3 py-2 border rounded-lg text-sm
-                                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                                    ${handleError ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-                    />
-                    <p className="mt-1 text-xs text-gray-400">
-                        小文字英数字とアンダースコア(_)のみ・3〜20文字
-                    </p>
-                    {handleError && (
-                        <p className="mt-1 text-xs text-red-500">{handleError}</p>
+                    {/* 表示名 */}
+                    <div>
+                        <label  htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                            表示名
+                        </label>
+                        <input 
+                            type="text"
+                            id="username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="山田太郎"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={submitting}
+                        />
+                    </div>
+
+                    {/* ハンドル */}
+                    <div>
+                        <label htmlFor="handle" className="block text-sm font-medium text-gray-700 mb-2">
+                            ハンドル
+                        </label>
+                        <div className="flex items-center">
+                            <span className="text-gray-500 mr-2">@</span>
+                            <input
+                                type="text"
+                                id="handle"
+                                value={handle}
+                                onChange={(e) => setHandle(e.target.value.toLowerCase())}
+                                placeholder="yamada_taro"
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                disabled={submitting}
+                            />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                            3〜20文字、英数字とアンダースコアのみ
+                        </p>
+                    </div>
+
+                    {/* 自己紹介 */}
+                    <div>
+                        <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
+                            自己紹介
+                        </label>
+                        <textarea
+                            id="bio"
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            placeholder="よろしくお願いします！"
+                            rows={4}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={submitting}
+                        />
+                    </div>
+
+                    {/* エラー・成功メッセージ */}
+                    {error && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-red-600">{error}</p>
+                        </div>
                     )}
-                </div>
 
-                {/* 自己紹介 */}
-                <div>
-                    <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
-                        自己紹介
-                    </label>
-                    <textarea
-                        id="bio"
-                        value={bio}
-                        onChange={(e) => onFieldChange(setBio, e.target.value)}
-                        rows={3}
-                        placeholder="自己紹介を入力してください"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    />
-                </div>
+                    {success && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-sm text-green-600">
+                                保存しました！プロフィールページに戻ります...
+                            </p>
+                        </div>
+                    )}
 
-                {/* アバターURL */}
-                <div>
-                    <label htmlFor="avatarUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                        アバターURL
-                    </label>
-                    <input
-                        id="avatarUrl"
-                        type="text"
-                        value={avatarUrl}
-                        onChange={(e) => onFieldChange(setAvatarUrl, e.target.value)}
-                        placeholder="https://example.com/avatar.png"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                </div>
-
-                {/* ボタン */}
-                <div className="flex gap-3 pt-2">
-                    <button
-                        type="submit"
-                        disabled={saving || !!handleError}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium
-                                   hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {saving ? '保存中…' : '保存する'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate('/profile')}
-                        className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium
-                                   hover:bg-gray-200 transition-colors"
-                    >
-                        キャンセル
-                    </button>
-                </div>
-            </form>
+                    {/* ボタン */}
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/profile')}
+                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                            disabled={submitting}
+                        >
+                            キャンセル
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {uploadingAvatar
+                                ? '画像をアップロード中...'
+                                : submitting
+                                ? '保存中...'
+                                : '保存'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }

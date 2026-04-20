@@ -41,18 +41,21 @@ export interface Database {
           user_id: string
           content: string
           created_at: string
+          image_url: string | null
         }
         Insert: {
           id?: string
           user_id: string
           content: string
           created_at?: string
+          image_url?: string | null
         }
         Update: {
           id?: string
           user_id?: string
           content?: string
           created_at?: string
+          image_url?: string | null
         }
       }
       likes: {
