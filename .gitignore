@@ -25,6 +25,14 @@ dist-ssr
 
 .env
 .env.example
+.env.test
 
 .claude/settings.json
 CLAUDE.md
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
