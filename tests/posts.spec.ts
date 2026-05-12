@@ -111,4 +111,42 @@ test.describe("投稿機能", () => {
         // 投稿が消える（タイムアウトを長めに設定）
         await expect(page.locator(`text=${postContent}`)).not.toBeVisible({ timeout: 10000 });
     });
+
+    test("画像付き投稿ができる", async ({ page }) => {
+        const postContent = `画像付きテスト ${Date.now()}`;
+        const testImagePath = "fixtures/test-post-image.png";
+
+        // テキストを入力
+        await page.waitForSelector("textarea");
+        await page.fill("textarea", postContent);
+
+        // 画像をアップロード
+        // 画像アップロードボタンのセレクタに合わせて調整
+        const imageInput = page.locator('input[type="file"][accept*="image"]');
+        await imageInput.setInputFiles(testImagePath);
+
+        // 投稿ボタンをクリック
+        await page.click("button:has-text('投稿')");
+
+        // 投稿が表示される
+        await expect(page.locator(`text=${postContent}`)).toBeVisible({ timeout: 10000 });
+
+        // 画像が表示される
+        await expect(page.locator('img[alt="投稿画像"]')).toBeVisible();
+    });
+
+    test("投稿カードからユーザープロフィールへ遷移できる", async ({ page }) => {
+        // タイムラインの投稿を待つ（ユーザー名が含まれる要素を待つ）           
+        await page.waitForSelector('a[href^="/users/"]', { timeout: 10000 });
+
+        // 最初の投稿のユーザー名リンクをクリック
+        const userLink = page.locator('a[href^="/users/"]').first();
+        await userLink.click();
+
+        // プロフィールページに遷移
+        await page.waitForURL(/\/users\/.+/);
+
+        // プロフィール情報が表示される
+        await expect(page.locator('text=@')).toBeVisible();
+    });
 });
