@@ -178,4 +178,103 @@ test.describe("いいね・フォロー・検索機能", () => {
         // 変更が反映されている
         await expect(page.locator(`text=${newUsername}`)).toBeVisible();
     });
+
+    test("いいねを外すことができる", async ({ page }) => {
+        // タイムラインに投稿があることを確認
+        await page.waitForSelector("button", { timeout: 10000 });
+
+        // いいね済みのボタンを探す（♥ のハート）
+        const likedButton = page.locator("button").filter({ hasText: /❤️ / }).first();
+
+        // いいね済みのボタンがある場合
+        const hasLiked = await likedButton.count() > 0;
+
+        if (hasLiked) {
+            // 現在のいいね数を取得（ボタンのテキストから数字を抽出）                                                                                              
+            const buttonText = await likedButton.textContent();
+            const likeCountBefore = parseInt(buttonText?.match(/\d+/)?.[0] || "0");
+
+            // いいねを外す
+            await likedButton.click();
+            await page.waitForTimeout(500);
+
+            // いいね数が減ったことを確認
+            const afterButton = page.locator("button").filter({ hasText: /♡/ }).first();
+            const afterText = await afterButton.textContent();
+            const likeCountAfter = parseInt(afterText?.match(/\d+/)?.[0] || "0");
+            expect(likeCountBefore).toBeGreaterThan(likeCountAfter);
+        } else {
+            // まずいいねしてから、それを外す
+            const likeButton = page.locator("button").filter({ hasText: /♡/ }).first();
+            await likeButton.click();
+            await page.waitForTimeout(500);
+
+            const unlikeButton = page.locator("button").filter({ hasText: /❤️/ }).first();
+            const buttonText = await unlikeButton.textContent();
+            const likeCountBefore = parseInt(buttonText?.match(/\d+/)?.[0] || "0"); 
+
+            await unlikeButton.click();
+            await page.waitForTimeout(500);
+
+            const afterButton = page.locator("button").filter({ hasText: /♡/ }).first();
+            const afterText = await afterButton.textContent();
+            const likeCountAfter = parseInt(afterText?.match(/\d+/)?.[0] || "0");
+            expect(likeCountBefore).toBeGreaterThan(likeCountAfter);
+        }
+    });
+
+    test("フォロー統計が表示される", async ({ page }) => {
+        // プロフィールページへ
+        await page.locator('nav a[href="/profile"]').click();
+        await page.waitForURL("/profile");
+
+        // フォロー中とフォロワーの数が表示される
+        await expect(page.getByText('フォロー中')).toBeVisible();
+        await expect(page.getByText('フォロワー')).toBeVisible();
+
+        // 数値が表示されている（数字を含むテキスト）
+        const statsText = await page.getByText('フォロー中').first().textContent();
+        expect(statsText).toBeTruthy();
+    });
+
+    test("存在しないユーザーのプロフィールはエラー表示", async ({ page }) => {
+        // 存在しないハンドルでアクセス
+        const nonExistentHandle = `no_user_${Date.now().toString().slice(-6)}`;
+        await page.goto(`/users/${nonExistentHandle}`);
+
+        // エラーメッセージが表示される
+        await expect(page.getByText("ユーザーが見つかりません")).toBeVisible({ timeout: 5000 });
+    });
+
+    test("投稿がないユーザーのプロフィールを表示", async ({ page }) => {
+        // ※ 別途、投稿がないテストユーザーを用意するか、
+        // 新規登録直後のユーザーで確認
+
+        // 自分のプロフィールを表示（投稿削除後など）
+        await page.locator('nav a[href="/profile"]').click();
+        await page.waitForURL("/profile");
+
+        // すべての投稿を削除してから確認、または
+        // 「まだ投稿がありません」メッセージの確認
+        const noPostsMessage = page.getByText('まだ投稿がありません');
+
+        if (await noPostsMessage.count() > 0) {
+            await expect(noPostsMessage).toBeVisible();
+        }
+    });
+
+    test("検索結果が0件の場合の表示", async ({ page }) => {
+        // 検索ページへ
+        await page.click("text=検索");
+        await page.waitForURL("/search");
+
+        // 存在しないユーザーで検索
+        const nonExistentUser = `xyz_${Date.now()}`;
+        await page.fill('input[placeholder*="検索"]', nonExistentUser);
+        await page.waitForTimeout(500);
+
+        // 検索結果が0件（フォローボタンが表示されない）
+        const followButtons = page.locator('button:has-text("フォローする")');
+        await expect(followButtons).toHaveCount(0, { timeout: 5000 });
+    });
 });

@@ -6,6 +6,12 @@
 
 # 知見まとめ
 
+## 更新履歴
+- **2026-05-11** 初版作成（CSSセレクタ、TimeoutError）
+- **2026-05-15** Strict Mode Violation、Promise/await、認証・ルーティングテストを追加
+
+---
+
 ## 1. CSSセレクタの基本構文
 
 ### 属性セレクタ
@@ -72,7 +78,7 @@ article, [data-testid="post"]
 
 ---
 
-## 3. 今回学んだこと
+## 3. 今回学んだこと（第1回：2026-05-11）
 
 ### 問題: TimeoutError
 ```
@@ -114,6 +120,116 @@ await userLink.click();
 ```
 ```typescript
 await page.waitForSelector('[data-testid="post-card"]', { timeout: 10000 });
+```
+
+---
+
+## 3.2. Strict Mode Violation（第2回：2026-05-15）
+
+### 問題
+```
+Error: strict mode violation: locator('text=@') resolved to 2 elements
+```
+
+### 原因
+Playwrightはデフォルトで、セレクタが**1つの要素に一致**することを期待します。セレクタが複数の要素に一致すると、strict mode violation エラーが発生します。
+
+**テストコード（navigation.spec.ts）:**
+```typescript
+await expect(page.locator('text=@')).toBeVisible();
+```
+
+**エラーの原因:**
+```html
+<!-- 2つの要素に '@' が含まれている -->
+<a href="/profile">@user_ff72deda</a>  <!-- ナビゲーションバー -->
+<p>@user_ff72deda</p>                  <!-- プロフィールページ本文 -->
+```
+
+### 解決策
+**オプション1:** `.first()` で最初の要素のみを使用
+```typescript
+await expect(page.locator('text=@').first()).toBeVisible();
+```
+
+**オプション2:** より具体的なセレクタを使う
+```typescript
+// ナビゲーションバーのリンクを確認
+await expect(page.locator('nav a[href="/profile"]')).toBeVisible();
+
+// または特定のコンテキスト内
+await expect(page.locator('.profile-header').getByText('@')).toBeVisible();
+```
+
+**オプション3:** `has()` で親要素を指定
+```typescript
+await expect(page.locator('nav', { hasText: '@' })).toBeVisible();
+```
+
+### Strict Mode Violation が発生しやすいセレクタ
+
+| セレクタ | 問題 | 改善案 |
+|---------|------|--------|
+| `page.locator('text=保存')` | 「保存」ボタンが複数ある | `.first()` またはより具体的なロール |
+| `page.getByText('フォロー')` | フォローボタンが複数ある | `.first()` または親要素で指定 |
+| `page.locator('button')` | ボタンが多数ある | 具体的なテキストやロールを指定 |
+
+---
+
+## 3.3. Promiseとawait（第2回：2026-05-15）
+
+### 問題
+```
+プロパティ 'match' は型 'Promise<string \| null>' に存在しません
+```
+
+### 原因
+Playwrightの多くのメソッド（`textContent()`、`innerHTML()`、`getValue()` など）は**Promiseを返します**。`await` を忘れると、Promiseオブジェクトに対して操作しようとしてエラーになります。
+
+**間違ったコード:**
+```typescript
+const text = page.locator('button').textContent();  // Promise<string | null>
+const num = text.match(/\d+/);  // ❌ エラー: Promiseにmatchはない
+```
+
+### 解決策
+**必ず `await` を使う:**
+```typescript
+const text = await page.locator('button').textContent();  // string | null
+const num = text?.match(/\d+/)?.[0];  // ✅ 正しい
+```
+
+### Promiseを返す主なメソッド
+
+| メソッド | 戻り値（Promiseでラップ） | 使用例 |
+|---------|--------------------------|--------|
+| `.textContent()` | `Promise<string \| null>` | `await elem.textContent()` |
+| `.innerHTML()` | `Promise<string \| null>` | `await elem.innerHTML()` |
+| `.inputValue()` | `Promise<string>` | `await input.inputValue()` |
+| `.getAttribute()` | `Promise<string \| null>` | `await elem.getAttribute('href')` |
+| `.count()` | `Promise<number>` | `await elems.count()` |
+| `.isVisible()` | `Promise<boolean>` | `await elem.isVisible()` |
+
+### 実践例: いいね数を取得する
+
+**間違った実装:**
+```typescript
+const countText = page.locator('button').textContent();
+const count = parseInt(countText.match(/\d+/)[0]);  // ❌ エラー
+```
+
+**正しい実装:**
+```typescript
+const countText = await page.locator('button').textContent();
+const count = parseInt(countText?.match(/\d+/)?.[0] || "0");  // ✅ 正しい
+```
+
+**オプショナルチェイニング(`?.`)の活用:**
+```typescript
+// textContent() が null を返す可能性があるため
+const text = await elem.textContent();
+const match = text?.match(/\d+/)?.[0];  // 安全にアクセス
+const num = match ? parseInt(match) : 0;
 ```
 
 ---
@@ -380,13 +496,119 @@ await expect(page.locator('button:has-text("フォローする")')).toBeVisible(
 
 ---
 
-## 自己採点基準
+### Q9. 以下のエラーの原因と解決策を説明してください
+
+```typescript
+await expect(page.locator('text=保存')).toBeVisible();
+
+// エラー:
+// strict mode violation: locator('text=保存') resolved to 3 elements
+```
+
+<details>
+<summary>回答</summary>
+
+**原因:** `text=保存` というセレクタがページ上の3つの要素に一致している
+
+**解決策:**
+
+1. `.first()` で最初の要素のみを使用:
+```typescript
+await expect(page.locator('text=保存').first()).toBeVisible();
+```
+
+2. より具体的なセレクタ:
+```typescript
+await expect(page.getByRole('button', { name: '保存' }).first()).toBeVisible();
+// または
+await expect(page.locator('.modal').getByText('保存')).toBeVisible();
+```
+
+3. 親要素で絞り込む:
+```typescript
+await expect(page.locator('.edit-form', { hasText: '保存' })).toBeVisible();
+```
+</details>
+
+---
+
+### Q10. 以下のコードのエラーを修正してください
+
+```typescript
+const buttonText = page.locator('button').textContent();
+const number = parseInt(buttonText.match(/\d+/)[0]);
+```
+
+<details>
+<summary>回答</summary>
+
+**問題:** `textContent()` は Promise を返すので `await` が必要
+
+**修正後:**
+```typescript
+const buttonText = await page.locator('button').textContent();
+const number = parseInt(buttonText?.match(/\d+/)?.[0] || "0");
+```
+
+**ポイント:**
+- `await` を忘れずに付ける
+- `textContent()` は `null` を返す可能性があるので `?.` を使う
+- マッチしない場合のデフォルト値を用意する
+</details>
+
+---
+
+### Q11. 認証・ルーティングテストで、「未ログイン時に保護ページへアクセスしたらリダイレクトされる」ことを確認するテストを完成させてください
+
+**穴埋め問題:**
+```typescript
+test("未ログイン時は保護ページにアクセスできない", async ({ page }) => {
+    // 認証ページに移動（ログインしていない状態）
+    await page.goto("/auth");
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+
+    // 保護されたページに直接アクセス
+    await page.goto("_____");
+
+    // 認証ページへリダイレクト
+    await page.__________("/auth");
+    await expect(page.locator('input[type="email"]'))._______();
+});
+```
+
+<details>
+<summary>回答</summary>
+
+```typescript
+test("未ログイン時は保護ページにアクセスできない", async ({ page }) => {
+    // 認証ページに移動（ログインしていない状態）
+    await page.goto("/auth");
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+
+    // 保護されたページに直接アクセス
+    await page.goto("/");
+
+    // 認証ページへリダイレクト
+    await page.waitForURL("/auth");
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+});
+```
+
+**ポイント:**
+- 保護されたルート（`/`、`/profile`、`/search` など）に直接アクセス
+- 認証ページへリダイレクトされることを `waitForURL()` で確認
+- ログインフォームが表示されることを確認
+</details>
+
+---
+
+## 自己採点基準（更新）
 
 | レベル | 問題数 | 目標正解数 | 評価 |
 |--------|--------|-----------|------|
 | レベル1（基礎） | 3問 | 3問 | Playwrightテストの基礎理解 |
 | レベル2（応用） | 3問 | 2問以上 | 実践的なテスト記述能力 |
-| レベル3（実践） | 2問 | 1問以上 | トラブルシューティング能力 |
+| レベル3（実践） | 5問 | 3問以上 | トラブルシューティング能力、認証・ルーティング理解 |
 
 ---
 
@@ -414,5 +636,90 @@ await expect(page.locator('button:has-text("フォローする")')).toBeVisible(
 |--------|------|--------|
 | `TimeoutError: waitForSelector` | セレクタが間違っている、または要素が表示されていない | セレクタを確認、DOM構造を確認、待ち時間を延長 |
 | `strict mode violation` | セレクタが複数の要素に一致 | `.first()` を付けるか、より具体的なセレクタを使う |
+| `プロパティ 'match' は型 'Promise<...>' に存在しません` | `await` を忘れている | `await page.locator(...).textContent()` のように `await` を付ける |
 | `Element not attached to DOM` | 要素が画面から消えた | 再度要素を取得する |
 | `Target closed` | ページが閉じた、またはナビゲートした | 適切な待機処理を入れる |
+
+---
+
+# 付録：今回実装したテスト一覧（第2回：2026-05-15）
+
+## 認証・ルーティングテスト (`auth.spec.ts`)
+
+| テスト名 | 内容 | 学んだこと |
+|---------|------|-----------|
+| 未ログイン時は保護ページにアクセスできない | 未ログイン状態で `/` にアクセス → `/auth` にリダイレクト | 認証チェックのテスト方法 |
+| 無効なURLはホームへリダイレクト | 存在しないURLにアクセス → `/` にリダイレクト | エラーハンドリングのテスト方法 |
+
+## インタラクションテスト (`interactions.spec.ts`)
+
+| テスト名 | 内容 | 学んだこと |
+|---------|------|-----------|
+| いいねを外すことができる | いいね済みの投稿でクリック → いいね解除 | 条件分岐、テキストから数字の抽出 |
+| フォロー統計が表示される | プロフィールページで「フォロー中」「フォロワー」が表示 | 統計情報の確認方法 |
+| 存在しないユーザーのプロフィールはエラー表示 | 存在しないハンドルでアクセス → エラーメッセージ | エッジケースのテスト方法 |
+| 投稿がないユーザーのプロフィールを表示 | 投稿がない状態でのプロフィール表示 | 条件分岐による対応 |
+| 検索結果が0件の場合の表示 | 存在しないユーザーで検索 → 結果0件 | `toHaveCount(0)` の使用方法 |
+
+## ナビゲーションテスト (`navigation.spec.ts` 新規作成)
+
+| テスト名 | 内容 | 学んだこと |
+|---------|------|-----------|
+| ホームボタンでホームページへ遷移 | 別ページからホームボタンで遷移 | ナビゲーション遷移のテスト |
+| 検索ボタンで検索ページへ遷移 | 検索ボタンで検索ページへ | 基本的な遷移テスト |
+| プロフィールボタンでプロフィールページへ遷移 | プロフィールボタンで遷移 | **strict mode violation の対応** |
+| ログアウトボタンで認証ページへ遷移 | ログアウトで認証ページへ | ログアウト機能のテスト |
+
+---
+
+# 付録：テスト実装のコツ
+
+## 1. 条件分岐のテスト
+
+テスト内で条件によって処理を分ける場合：
+
+```typescript
+// いいね済みの投稿があるか確認
+const hasLiked = await likedButton.count() > 0;
+
+if (hasLiked) {
+    // いいね解除の処理
+} else {
+    // まずいいねしてから解除する処理
+}
+```
+
+## 2. テキストから数値を抽出する
+
+ボタン内のカウント値などを取得：
+
+```typescript
+const text = await button.textContent();
+// "❤️ 5" や "♡ 3" などの文字列から数字を抽出
+const count = parseInt(text?.match(/\d+/)?.[0] || "0");
+```
+
+## 3. 0件確認のテスト
+
+要素が存在しないことを確認：
+
+```typescript
+// 方法1: toHaveCount(0)
+await expect(page.locator('button:has-text("フォローする")')).toHaveCount(0);
+
+// 方法2: not.toBeVisible()
+await expect(page.locator('text=結果なし')).not.toBeVisible();
+```
+
+## 4. リダイレクト確認のテスト
+
+```typescript
+// 直接アクセス
+await page.goto("/protected-page");
+
+// リダイレクト先を確認
+await page.waitForURL("/auth");
+await expect(page).toHaveURL("/auth");
+```
+
+

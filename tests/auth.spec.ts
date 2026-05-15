@@ -87,4 +87,36 @@ test.describe("認証機能", () => {
         // ログインフォームが表示される
         await expect(page.locator('input[type="email"]')).toBeVisible();
     });
+
+    test("未ログイン時は保護ページにアクセスできない", async ({ page }) => {
+        // 認証ページに移動（ログインしていない状態）
+        await page.goto("/auth");
+        await expect(page.locator('input[type="email"]')).toBeVisible();
+
+        // 保護されたページに直接アクセス
+        await page.goto("/");
+
+        // 認証ページへリダイレクト
+        await page.waitForURL("/auth");
+        await expect(page.locator('input[type="email"]')).toBeVisible();
+    });
+
+    test("無効なURLはホームへリダイレクト", async ({ page }) => {
+        // ログイン状態で
+        await page.goto("/auth");
+        await page.click("text=ログイン");
+        await page.fill('input[type="email"]', "test1777258061943@example.com");
+        await page.fill('input[type="password"]', "TestPassword123!");
+        await Promise.all([
+            page.waitForURL("/", { timeout: 30000 }),
+            page.click("button[type='submit']")
+        ]);
+
+        // 存在しないURLにアクセス
+        await page.goto("/invalid-page-12345");
+
+        // ホームへリダイレクト
+        await page.waitForURL("/");
+        await expect(page.locator("textarea")).toBeVisible();
+    });
 });
