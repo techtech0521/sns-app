@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import FollowButton from "../components/profile/FollowButton";
 import type { Database } from "../types/database.types";
+import { sanitizeBio } from '../utils/sanitizer';
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -136,7 +137,7 @@ function UserCard({ profile, currentUserId }: UserCardProps) {
                         <p className="text-sm text-gray-500 truncate">@{profile.handle}</p>
                         {profile.bio && (
                             <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                                {profile.bio}
+                                {sanitizeBio(profile.bio)}
                             </p>
                         )}
                     </div>

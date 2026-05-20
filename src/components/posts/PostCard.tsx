@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import LikeButton from './LikeButton';
 import type { Database } from "../../types/database.types";
+import { sanitizePostContent } from '../../utils/sanitizer';
 
 type Post = Database["public"]["Tables"]["posts"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -94,7 +95,7 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
 
                     {/* 投稿本文 */}
                     <p className="text-gray-800 text-sm whitespace-pre-wrap break-words mb-2">
-                        {post.content}
+                        {sanitizePostContent(post.content)}
                     </p>
 
                     {/* 画像（あれば表示） */}

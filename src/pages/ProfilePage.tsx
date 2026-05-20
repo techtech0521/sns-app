@@ -6,7 +6,8 @@ import FollowButton from '../components/profile/FollowButton';
 import FollowStats from '../components/profile/FollowStats';
 import PostCard from '../components/posts/PostCard';
 import type { Database } from '../types/database.types';
- 
+import { sanitizeBio } from '../utils/sanitizer';
+
 type Post = Database['public']['Tables']['posts']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
  
@@ -119,7 +120,9 @@ export default function ProfilePage() {
 
                     {/* 自己紹介 */}
                     {profile.bio && (
-                        <p className="mt-3 text-gray-700 whitespace-pre-wrap">{profile.bio}</p>
+                        <p className="mt-3 text-gray-700 whitespace-pre-wrap">
+                            {sanitizeBio(profile.bio)}
+                        </p>
                     )}
 
                     {/* フォロー統計 */}

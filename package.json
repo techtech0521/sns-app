@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.91.0",
+    "@types/dompurify": "^3.0.5",
+    "dompurify": "^3.4.4",
     "playwright": "^1.59.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
