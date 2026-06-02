@@ -40,3 +40,10 @@ export function sanitizeBio(bio: string | null | undefined): string {
 export function sanitaizeTextWithMensions(text: string): string {
     return sanitizeHtml(text);
 }
+
+/**
+ * コメント内容をサニタイズ（XSS対策）
+ */
+export function sanitizeCommentContent(content: string):string {
+    return sanitizeHtml(content);
+}

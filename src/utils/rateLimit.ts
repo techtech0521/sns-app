@@ -12,6 +12,7 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
     post_create: { maxAttempts: 10, windowMs: 60000 },   // 1分間に10投稿まで
     like_toggle: { maxAttempts: 30, windowMs: 60000 },   // 1分間に30いいねまで
     follow_toggle: { maxAttempts: 20, windowMs: 60000 }, // 1分間に20フォローまで
+    comment_create: { maxAttempts: 10, windowMs: 60000 }, // 1分間に10コメントまで
 };
 
 interface AttemptRecord {
@@ -89,6 +90,7 @@ export function getRateLimitMessage(action: string, resetIn: number): string {
         post_create: `投稿の制限に達しました。${resetIn}秒後に再試行してください。`,
         like_toggle: `いいねの制限に達しました。${resetIn}秒後に再試行してください。`,
         follow_toggle: `フォローの制限に達しました。${resetIn}秒後に再試行してください。`,
+        comment_create: `コメントの制限に達しました。${resetIn}秒後に再試行してください。`,
     };
 
     return messages[action] || `制限に達しました。${resetIn}秒後に再試行してください。`;

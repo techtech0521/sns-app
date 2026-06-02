@@ -66,3 +66,18 @@ export const validatePassword = (password: string): { valid: boolean; error?: st
 
     return { valid: true };
 };
+
+// コメント内容のバリデーション
+export const validateCommentContent = (content: string): { valid: boolean; error?: string } => {
+    const trimmed = content.trim();
+
+    if (trimmed.length === 0) {
+        return { valid: false, error: "コメントを入力してください" };
+    }
+
+    if (trimmed.length > 140) {
+        return { valid: false, error: "コメントは140文字以内で入力してください" };
+    }
+
+    return { valid: true };
+};
