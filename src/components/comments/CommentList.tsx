@@ -14,9 +14,10 @@ interface CommentWithProfile extends Comment {
 interface CommentListProps {
     postId: string;
     isOpen: boolean;
+    onCommentCountChange?: (count: number) => void;
 }
 
-export default function CommentList({ postId, isOpen }: CommentListProps) {
+export default function CommentList({ postId, isOpen, onCommentCountChange }: CommentListProps) {
     const [comments, setComments] = useState<CommentWithProfile[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -35,6 +36,11 @@ export default function CommentList({ postId, isOpen }: CommentListProps) {
 
             if (error) throw error;
             setComments(data as CommentWithProfile[]);
+
+            // コメント数が変更されたことを通知
+            if (onCommentCountChange) {
+                onCommentCountChange(data?.length ?? 0);
+            }
         } catch (error) {
             console.error("コメント取得エラー:", error);
         } finally {
@@ -51,7 +57,14 @@ export default function CommentList({ postId, isOpen }: CommentListProps) {
 
     // コメント削除時の処理
     const handleDelete = (commentId: string) => {
-        setComments((prev) => prev.filter((c) => c.id !== commentId));
+        setComments((prev) => {
+            const newComments = prev.filter((c) => c.id !== commentId);
+            // コメント数が変更されたことを通知
+            if (onCommentCountChange) {
+                onCommentCountChange(newComments.length);
+            }
+            return newComments;
+        });
     };
 
     if (!isOpen) return null;

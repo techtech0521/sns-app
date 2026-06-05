@@ -9,6 +9,7 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 interface PostWithProfile extends Post {
     profiles: Profile;
+    comments?: { id: string }[];
 }
 
 interface PostListProps {
@@ -49,7 +50,8 @@ export default function PostList({ onEditPost, refreshTrigger = 0, filterType = 
             .from("posts")
             .select(`
                 *,
-                profiles (*)
+                profiles (*),
+                comments (id)
             `)
             .order("created_at", { ascending: false })
             .limit(50);
@@ -86,7 +88,8 @@ export default function PostList({ onEditPost, refreshTrigger = 0, filterType = 
             .from("posts")
             .select(`
                 *,
-                profiles (*)
+                profiles (*),
+                comments (id)
             `)
             .in("user_id", followingIds)
             .order("created_at", { ascending: false })
