@@ -29,7 +29,7 @@ export default function PostList({ onEditPost, refreshTrigger = 0, filterType = 
     } = useInfinitePosts(filterType, refreshTrigger);
 
     // 投稿削除時の処理
-    const handleDelete = (postId: string) => {
+    const handleDelete = (_postId: string) => {
         // 削除済みとして投稿をフィルタリング
         // * 実際の削除処理は PostCard 内で行われる
     };
