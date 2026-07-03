@@ -13,15 +13,17 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 interface PostWithProfile extends Post {
     profiles: Profile;
     comments?: { id: string }[];
+    likes?: { id: string; user_id: string }[]; 
 }
 
 interface PostCardProps {
     post: PostWithProfile;
     onEdit: (post: PostWithProfile) => void;
     onDelete: (postId: string) => void;
+    currentUserId?: string;
 }
 
-export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
+export default function PostCard({ post, onEdit, onDelete, currentUserId }: PostCardProps) {
     const { user } = useAuth();
     const [deleting, setDeleting] = useState(false);
     const [showComments, setShowComments] = useState(false);
@@ -56,7 +58,7 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
     };
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+        <div data-testid="post-card" className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
             {/* ヘッダー（アバター・ユーザー情報） */}
             <div className="flex items-start gap-3">
                 {/* アバター（クリック可能） */}
@@ -119,7 +121,11 @@ export default function PostCard({ post, onEdit, onDelete }: PostCardProps) {
 
                     {/* アクションボタン */}
                     <div className="flex items-center gap-4 mt-3">
-                        <LikeButton postId={post.id} />
+                        <LikeButton 
+                            postId={post.id}
+                            likes={post.likes}
+                            currentUserId={currentUserId}
+                        />
                         <button
                             onClick={() => setShowComments(!showComments)}
                             className="text-xs text-gray-500 hover:text-blue-600 font-medium flex items-center gap-1"

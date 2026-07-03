@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { supabase } from "../../lib/supabase";
+import { useInfinitePosts } from "../../hooks/useInfinitePosts";
 import { useAuth } from "../../contexts/AuthContext";
 import PostCard from "./PostCard";
 import type { Database } from "../../types/database.types";
@@ -19,104 +18,33 @@ interface PostListProps {
 }
 
 export default function PostList({ onEditPost, refreshTrigger = 0, filterType = "all" }: PostListProps) {
-    const { user } = useAuth()
-    const [posts, setPosts] = useState<PostWithProfile[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-
-    // 投稿一覧を取得
-    const fetchPosts = async () => {
-        try {
-            setLoading(true);
-            setError("");
-
-            if (filterType === "following") {
-                // フォロー中のユーザーの投稿のみ取得
-                await fetchFollowingPosts();
-            } else {
-                // 全体の投稿を取得
-                await fetchAllPosts();
-            }
-        } catch (err) {
-            console.error('投稿取得エラー:', err);
-            setError("投稿の読み込みに失敗しました");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchAllPosts = async () => {
-        const { data, error } = await supabase
-            .from("posts")
-            .select(`
-                *,
-                profiles (*),
-                comments (id)
-            `)
-            .order("created_at", { ascending: false })
-            .limit(50);
-
-        if (error) throw error;
-        setPosts(data as PostWithProfile[]);
-    }
-
-    const fetchFollowingPosts = async () => {
-        if (!user) {
-            setPosts([]);
-            return;
-        }
-
-        // フォローしているユーザーのIDを取得
-        const { data: follows, error: followsError } = await supabase
-            .from("follows")
-            .select("following_id")
-            .eq("following_id", user.id);
-
-        if (followsError) throw followsError;
-
-        // 型アサーションを使用して型エラーを回避
-        const followingIds = (follows as any)?.map((f: any) => f.following_id) || [];
-
-        // フォローしているユーザーがいない場合
-        if (followingIds.length === 0) {
-            setPosts([]);
-            return;
-        }
-
-        // フォローしているユーザーの投稿を取得
-        const { data, error } = await supabase
-            .from("posts")
-            .select(`
-                *,
-                profiles (*),
-                comments (id)
-            `)
-            .in("user_id", followingIds)
-            .order("created_at", { ascending: false })
-            .limit(50);
-
-        if (error) throw error;
-        setPosts(data as PostWithProfile[]);
-    };
-
-    // 初回読み込みと更新トリガー
-    useEffect(() => {
-        fetchPosts();
-    }, [refreshTrigger, filterType]);
+    const { user } = useAuth();
+    const {
+        posts,
+        loading,
+        loadingMore,
+        hasMore,
+        observerRef,
+        error,
+    } = useInfinitePosts(filterType, refreshTrigger);
 
     // 投稿削除時の処理
     const handleDelete = (postId: string) => {
-        setPosts((prev) => prev.filter((p) => p.id !== postId));
+        // 削除済みとして投稿をフィルタリング
+        // * 実際の削除処理は PostCard 内で行われる
     };
 
+    // 初回ロード中
     if (loading) {
         return <div className="text-center py-8 text-gray-400">読み込み中...</div>;
     }
 
+    // エラー表示
     if (error) {
         return <div className="text-center py-8 text-red-500">{error}</div>;
     }
 
+    // 投稿がない場合
     if (posts.length === 0) {
         if (filterType === "following") {
             return (
@@ -145,14 +73,35 @@ export default function PostList({ onEditPost, refreshTrigger = 0, filterType = 
 
     return (
         <div className="space-y-4">
-            {posts.map((post) => (
-                <PostCard
-                    key={post.id}
-                    post={post}
-                    onEdit={onEditPost}
-                    onDelete={handleDelete}
-                />
-            ))}
+            {posts.map((post, index) => {
+                // 最後から1番目の要素にobserverRefをアタッチ
+                const isObserverTarget = index === posts.length - 1;
+
+                return (
+                    <div key={post.id} ref={isObserverTarget ? observerRef : undefined}>
+                        <PostCard
+                            post={post}
+                            onEdit={onEditPost}
+                            onDelete={handleDelete}
+                            currentUserId={user?.id}
+                        />
+                    </div>
+                );
+            })}
+
+            {/* 追加ロード中のスピナー */}
+            {loadingMore && (
+                <div className="text-center py-4">
+                    <div className="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+            )}
+
+            {/* これ以上データがない場合のメッセージ */}
+            {!hasMore && posts.length > 0 && (
+                <div className="text-center py-4">
+                    <p className="text-gray-400 text-xs">これ以上投稿はありません</p>
+                </div>
+            )}
         </div>
     );
 }
